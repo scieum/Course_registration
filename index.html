@@ -430,7 +430,7 @@
       <img class="leaf l2" src="img/pen.png" alt="" aria-hidden="true">
       <img class="leaf l3" src="img/book.png" alt="" aria-hidden="true">
       <div class="shadow"></div>
-      <img class="char" src="img/character1.png" alt="속초고 수달 캐릭터" onerror="this.style.display='none'">
+      <img class="char" id="homeChar" src="img/character1.png" alt="속초고 수달 캐릭터" onerror="this.style.display='none'">
     </div>
   </div>
 
@@ -705,7 +705,9 @@
   const AVA_KEY='sokcho_ava_v1';
   const AVATARS=['img/character1.png','img/character2.png','img/character3.png','img/character4.png','img/character5.png'];
   function getAva(){ try{ return localStorage.getItem(AVA_KEY)||AVATARS[0]; }catch(e){ return AVATARS[0]; } }
-  function applyAva(){ const el=document.getElementById('myAva'); if(el) el.src=getAva(); }
+  function applyAva(){ const a=getAva();
+    const el=document.getElementById('myAva'); if(el) el.src=a;
+    const hc=document.getElementById('homeChar'); if(hc) hc.src=a; }   /* 히어로 캐릭터 동기화 */
   function setAva(src){ try{ localStorage.setItem(AVA_KEY, src); }catch(e){} applyAva(); }
 
   const state = { mode:'gye', sel:GYE[0], q:'', onlyOpen:false };
@@ -1126,7 +1128,7 @@
       if(!/^\d{5}$/.test(hak) || !name){ er.textContent='학번 5자리와 이름을 정확히 입력해 주세요.'; er.hidden=false; return; }
       const rec=rosterFor(lpGrade)[hak];
       if(!rec || rec.name!==name){ er.textContent='학번 또는 이름이 일치하지 않아요. 다시 확인해 주세요.'; er.hidden=false; return; }
-      setStu(hak); setGrade(lpGrade); seedLockedPicks(); updatePickedUI(); leaveLanding();
+      setStu(hak); setGrade(lpGrade); setNick(rec.name); seedLockedPicks(); updatePickedUI(); leaveLanding();
       return;
     }
     const b=e.target.closest('.lp-grade'); if(!b) return;
