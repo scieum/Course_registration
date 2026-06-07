@@ -318,6 +318,8 @@
     padding:10px 12px;font-size:13px;}
   #landing .lp-back{border:0;background:transparent;color:#5a7894;font-size:13px;font-weight:600;
     font-family:inherit;cursor:pointer;padding:4px;}
+  #landing .lp-skip{border:0;background:transparent;color:#2b6cb0;font-size:14px;font-weight:700;
+    font-family:inherit;cursor:pointer;padding:6px;text-decoration:underline;}
 
   /* ===================== 마이페이지 ===================== */
   #my{max-width:480px;margin:0 auto;min-height:100vh;background:#fff;padding-bottom:60px;}
@@ -399,6 +401,7 @@
       <input class="lp-input" id="lpName" type="text" placeholder="이름">
       <div class="lp-login-err" id="lpErr" hidden></div>
       <button class="lp-login-btn" id="lpLoginBtn">확인</button>
+      <button class="lp-skip" id="lpSkip">로그인 없이 둘러보기</button>
       <button class="lp-back" id="lpBack">‹ 학년 다시 선택</button>
     </div>
     <div class="lp-note" id="lpNote" hidden></div>
@@ -1135,6 +1138,7 @@
   function leaveLanding(){ landing.hidden=true; showHome(); }
   landing.addEventListener('click', e=>{
     if(e.target.closest('#lpBack')){ lpShowGrades(); return; }
+    if(e.target.closest('#lpSkip')){ setGrade(lpGrade); setStu(''); updatePickedUI(); leaveLanding(); return; }   // 로그인 없이 둘러보기
     if(e.target.closest('#lpLoginBtn')){
       const hak=(document.getElementById('lpHak').value||'').trim();
       const name=(document.getElementById('lpName').value||'').trim();
