@@ -277,9 +277,10 @@
   #home .hchip .dot{width:9px;height:9px;border-radius:50%;background:var(--bc,#cbb98f);flex:0 0 auto;}
 
   /* ===================== 랜딩(학년 선택) ===================== */
-  #landing{max-width:480px;margin:0 auto;height:100vh;overflow:hidden;
+  #landing{max-width:480px;margin:0 auto;height:100vh;height:100dvh;overflow:hidden;
     background:linear-gradient(180deg,#DCEDFB 0%,#EAF4FC 45%,#F7FBFE 100%);}
-  #landing .lp{height:100vh;display:flex;flex-direction:column;padding:40px 24px 32px;}
+  #landing .lp{height:100vh;height:100dvh;display:flex;flex-direction:column;
+    padding:40px 24px calc(28px + env(safe-area-inset-bottom));}
   #landing .lp-top{flex:0 0 auto;margin-top:44px;}
   #landing .lp-title{font-family:var(--disp);font-weight:800;font-size:28px;line-height:1.25;
     color:#1f3a52;letter-spacing:-.5px;}
@@ -394,7 +395,7 @@
 
   <!-- 히어로: 살펴본 추천과목 -->
   <div class="hero">
-    <div class="label">지금까지 선택한 과목</div>
+    <div class="label" id="homeLabel">지금까지 선택한 과목</div>
     <div class="count">
       <span class="num" data-picked-count>0</span>
       <span class="unit">과목</span>
@@ -637,7 +638,9 @@
   /* 닉네임 — 캐시 저장 */
   const NICK_KEY='sokcho_nick_v1';
   function getNick(){ try{ return localStorage.getItem(NICK_KEY) || '속초고 학생'; }catch(e){ return '속초고 학생'; } }
-  function setNick(v){ try{ localStorage.setItem(NICK_KEY, v); }catch(e){} const el=document.getElementById('myNick'); if(el) el.textContent=v; }
+  function setNick(v){ try{ localStorage.setItem(NICK_KEY, v); }catch(e){}
+    const el=document.getElementById('myNick'); if(el) el.textContent=v;
+    const hl=document.getElementById('homeLabel'); if(hl) hl.textContent=v+' 학생이 지금까지 선택한 과목'; }
 
   /* 프로필 아바타 — 캐시 저장 */
   const AVA_KEY='sokcho_ava_v1';
