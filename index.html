@@ -596,8 +596,9 @@
 
   /* ---- 담은 과목: 캐시(localStorage) 사용, 별도 저장소 없음 ---- */
   const PICK_KEY='sokcho_picked_v1';
-  function getPicked(){ try{ return JSON.parse(localStorage.getItem(PICK_KEY))||[]; }catch(e){ return []; } }
-  function setPicked(a){ try{ localStorage.setItem(PICK_KEY, JSON.stringify(a)); }catch(e){} }
+  function pickKey(){ const id=getStu(); return id ? 'sokcho_pick_'+id : PICK_KEY; }   /* 학생별 분리 저장 */
+  function getPicked(){ try{ return JSON.parse(localStorage.getItem(pickKey()))||[]; }catch(e){ return []; } }
+  function setPicked(a){ try{ localStorage.setItem(pickKey(), JSON.stringify(a)); }catch(e){} }
   function isPicked(n){ return getPicked().includes(n); }
   /* 로그인한 2학년 학생의 확정 과목(2학년 1·2학기) — 변경 불가(잠금) */
   function lockedSet(){
