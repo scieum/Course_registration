@@ -475,6 +475,11 @@
         <span class="r-tx"><span class="r-sub">6개 대학 · 계열별 추천과목을 한눈에</span><span class="r-tt">학교별로 보기</span></span>
         <span class="r-ar">›</span>
       </button>
+      <button class="row" id="guidebookRow">
+        <span class="r-ic"><img src="img/book.png" alt="" aria-hidden="true"></span>
+        <span class="r-tx"><span class="r-sub" id="gbSub">학년별 선택과목 가이드북(전자책)</span><span class="r-tt">가이드북 바로가기</span></span>
+        <span class="r-ar">›</span>
+      </button>
     </div>
 
     <div class="home-sec">
@@ -1071,6 +1076,13 @@
   });
   document.getElementById('goHome').addEventListener('click', showHome);
 
+  /* 가이드북 바로가기 (학년별 전자책) */
+  const GUIDEBOOK={ '1':'https://ebook.dsummer.co.kr/books/fzfh/#p=1', '2':'https://ebook.dsummer.co.kr/books/nycq/#p=1' };
+  document.getElementById('guidebookRow').addEventListener('click', ()=>{
+    const url = GUIDEBOOK[getGrade()] || GUIDEBOOK['2'];
+    window.open(url, '_blank', 'noopener');
+  });
+
   /* 홈 통계 카드 → 팝업 */
   document.querySelectorAll('#home .stat.to-my').forEach(el=>el.addEventListener('click',()=>{
     if(el.dataset.pop==='gye') openGyeModal(); else openPickModal();
@@ -1101,7 +1113,9 @@
   function gradeLabel(){ const g=getGrade(); if(!g) return '학년 미설정';
     const id=getStu(); const st=id?rosterFor(g)[id]:null;
     return st ? g+'학년 · '+st.name+'('+id+')' : g+'학년'; }
-  function updateGradeUI(){ const el=document.getElementById('myGradeLabel'); if(el) el.textContent=gradeLabel(); }
+  function updateGradeUI(){ const el=document.getElementById('myGradeLabel'); if(el) el.textContent=gradeLabel();
+    const gb=document.getElementById('gbSub'); if(gb){ const g=getGrade();
+      gb.textContent = g ? g+'학년 선택과목 가이드북(전자책)' : '학년별 선택과목 가이드북(전자책)'; } }
   function setGrade(g){ try{ localStorage.setItem(GRADE_KEY, g); }catch(e){} updateGradeUI(); }
   function fitLanding(){ const h=window.innerHeight+'px'; landing.style.height=h;
     const lp=landing.firstElementChild; if(lp) lp.style.height=h; }
