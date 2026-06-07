@@ -1,0 +1,6 @@
+# Claude Code 로컬 설정/메모리 (개인용)
+.claude/
+
+# OS
+Thumbs.db
+.DS_Store
