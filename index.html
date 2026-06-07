@@ -92,6 +92,10 @@
   #results .chip,.modal .chip{cursor:pointer;}
   .chip.picked{box-shadow:0 0 0 2px var(--near);}
   .chip.picked .nm::before{content:"✓ ";font-weight:700;}
+  /* 확정(잠금) 과목 — 2학년 1·2학기 수강 확정, 변경 불가 */
+  #results .chip.locked,.modal .chip.locked{cursor:default;opacity:.96;}
+  .chip.locked.picked .nm::before{content:"🔒 ";}
+  .modal .chip.locked:not(.picked) .nm::before{content:"🔒 ";}
   /* 학기별 정원 표시 */
   .q-cnt{font-weight:700;color:var(--silver);font-size:.92em;}
   .q-cnt.done{color:#0f7a3d;}
@@ -301,6 +305,19 @@
   #landing .lp-note{flex:0 0 auto;margin-top:14px;background:#fff7e0;border:1px solid #f6e6b8;color:#8a6d1e;
     border-radius:12px;padding:12px 14px;font-size:13px;line-height:1.6;}
   #landing .lp-note a{color:#0f5aa0;font-weight:700;cursor:pointer;text-decoration:underline;}
+  /* 2학년 로그인 폼 */
+  #landing .lp-login{flex:0 0 auto;display:flex;flex-direction:column;gap:10px;}
+  #landing .lp-login-t{font-size:15px;font-weight:800;color:#1f3a52;margin-bottom:2px;}
+  #landing .lp-input{border:1px solid #cdddec;border-radius:14px;padding:15px 16px;font-size:16px;
+    font-family:inherit;background:#fff;color:#1f3a52;outline:none;}
+  #landing .lp-input:focus{border-color:#7fb1dc;}
+  #landing .lp-login-btn{border:0;background:#2b6cb0;color:#fff;border-radius:14px;padding:16px;
+    font-size:16px;font-weight:800;font-family:inherit;cursor:pointer;}
+  #landing .lp-login-btn:active{filter:brightness(1.08);}
+  #landing .lp-login-err{background:#fce8ed;color:#8f3b50;border:1px solid #f6ccd6;border-radius:10px;
+    padding:10px 12px;font-size:13px;}
+  #landing .lp-back{border:0;background:transparent;color:#5a7894;font-size:13px;font-weight:600;
+    font-family:inherit;cursor:pointer;padding:4px;}
 
   /* ===================== 마이페이지 ===================== */
   #my{max-width:480px;margin:0 auto;min-height:100vh;background:#fff;padding-bottom:60px;}
@@ -372,7 +389,7 @@
       <span class="lp-note-music l-n1">♪</span><span class="lp-note-music l-n2">♬</span>
       <img src="img/character4.png" alt="속초고 캐릭터" onerror="this.style.display='none'">
     </div>
-    <div class="lp-grades">
+    <div class="lp-grades" id="lpGrades">
       <button class="lp-grade" data-grade="1">1학년</button>
       <button class="lp-grade" data-grade="2">2학년</button>
     </div>
@@ -546,6 +563,7 @@
 </div>
 
 <script src="data.js"></script>
+<script src="data_students.js"></script>
 <script>
 (function(){
   const {PROGRAMS, GUIDE, GYE, lookupSubject} = window.APPDATA;
@@ -572,7 +590,32 @@
   function getPicked(){ try{ return JSON.parse(localStorage.getItem(PICK_KEY))||[]; }catch(e){ return []; } }
   function setPicked(a){ try{ localStorage.setItem(PICK_KEY, JSON.stringify(a)); }catch(e){} }
   function isPicked(n){ return getPicked().includes(n); }
+  /* 로그인한 2학년 학생의 확정 과목(2학년 1·2학기) — 변경 불가(잠금) */
+  function lockedSet(){
+    try{ const id=localStorage.getItem(STU_KEY); if(!id) return new Set();
+      const s=(window.STUDENTS||{})[id]; if(!s) return new Set();
+      return new Set([...(s.s1||[]),...(s.s2||[])]);
+    }catch(e){ return new Set(); }
+  }
+  function isLocked(n){ return lockedSet().has(n); }
+  /* 확정 과목은 학생의 실제 수강 학기(s1=2학년 1학기, s2=2학년 2학기)로 분류 */
+  function lockedSemOf(n){
+    try{ const id=localStorage.getItem(STU_KEY); if(!id) return null;
+      const s=(window.STUDENTS||{})[id]; if(!s) return null;
+      if((s.s1||[]).includes(n)) return '2학년 1학기';
+      if((s.s2||[]).includes(n)) return '2학년 2학기';
+      return null;
+    }catch(e){ return null; }
+  }
+  /* 로그인 직후: 확정 과목을 담긴 상태로 병합 */
+  function seedLockedPicks(){
+    const lk=[...lockedSet()]; if(!lk.length) return;
+    const a=getPicked(); let changed=false;
+    lk.forEach(n=>{ if(!a.includes(n)){ a.push(n); changed=true; } });
+    if(changed) setPicked(a);
+  }
   function togglePick(n){
+    if(isLocked(n)) return;   // 확정된 2학년 과목은 빼기 불가
     const a=getPicked(); const i=a.indexOf(n);
     if(i>=0) a.splice(i,1); else a.push(n);
     setPicked(a); updatePickedUI();
@@ -595,7 +638,9 @@
   const SEM_SHORT={'2학년 1학기':'2-1','2학년 2학기':'2-2','3학년 1학기':'3-1','3학년 2학기':'3-2'};
   function pickedBySem(){
     const m={}; SEM_ORDER.forEach(l=>m[l]=0);
-    getPicked().forEach(n=>{ const s=lookupSubject(n);
+    getPicked().forEach(n=>{ const lo=lockedSemOf(n);
+      if(lo){ if(lo in m) m[lo]++; return; }
+      const s=lookupSubject(n);
       if(s.status==='open'){ const l=ORD_LABEL[semOrd(s.label)]; if(l in m) m[l]++; } });
     return m;
   }
@@ -637,6 +682,9 @@
 
   /* 닉네임 — 캐시 저장 */
   const NICK_KEY='sokcho_nick_v1';
+  const STU_KEY='sokcho_stu_v1';
+  function getStu(){ try{ return localStorage.getItem(STU_KEY)||''; }catch(e){ return ''; } }
+  function setStu(id){ try{ id? localStorage.setItem(STU_KEY,id) : localStorage.removeItem(STU_KEY); }catch(e){} }
   function getNick(){ try{ return localStorage.getItem(NICK_KEY) || '속초고 학생'; }catch(e){ return '속초고 학생'; } }
   function setNick(v){ try{ localStorage.setItem(NICK_KEY, v); }catch(e){}
     const el=document.getElementById('myNick'); if(el) el.textContent=v;
@@ -670,6 +718,7 @@
   }
   const ORD_LABEL={1:'1학년 1학기',2:'1학년 2학기',3:'2학년 1학기',4:'2학년 2학기',5:'3학년 1학기',6:'3학년 2학기'};
   function subjOrd(name){
+    const lo=lockedSemOf(name); if(lo) return semOrd(lo);
     const s=lookupSubject(name);
     if(s.status==='open') return semOrd(s.label);
     if(s.status==='none') return 100;   // 미개설
@@ -680,11 +729,15 @@
   function chip(name, force){
     const s = lookupSubject(name);
     let cls='area', grade='';
-    if (s.status==='open'){ cls='open'; grade = s.label; }
+    if (s.status==='open'){ cls='open'; grade = lockedSemOf(name) || s.label; }
     else if (s.status==='none'){ cls='none'; grade='미개설'; }
     if (!force && state.onlyOpen && cls!=='open') return '';
-    const on = isPicked(name) ? ' picked' : '';
-    return `<span class="chip ${cls}${on}" data-name="${name}"><span class="nm">${name}</span>${grade?`<span class="g">${grade}</span>`:''}</span>`;
+    const lk = isLocked(name);
+    // 로그인한 2학년 학생: 2학년 전용 과목은 신청 불가(3학년만), 확정 과목은 빼기 불가
+    const blocked = lk || (getStu() && s.status==='open' && /2학년/.test(s.label) && !/3학년/.test(s.label));
+    const on = (lk || isPicked(name)) ? ' picked' : '';
+    const lc = blocked ? ' locked' : '';
+    return `<span class="chip ${cls}${on}${lc}" data-name="${name}"${blocked?' data-locked="1"':''}><span class="nm">${name}</span>${grade?`<span class="g">${grade}</span>`:''}</span>`;
   }
 
   /* 학기순 정렬된 칩 모음 */
@@ -702,9 +755,11 @@
     const buckets={}, order=[]; const seen=new Set();
     [...p.core,...p.rec].flatMap(expand).forEach(name=>{
       const k=name.trim(); if(seen.has(k))return; seen.add(k);
+      const lo=lockedSemOf(name);
       const s=lookupSubject(name);
       let label;
-      if(s.status==='open') label=ORD_LABEL[semOrd(s.label)]||s.label;
+      if(lo) label=lo;
+      else if(s.status==='open') label=ORD_LABEL[semOrd(s.label)]||s.label;
       else if(s.status==='none') label='속초고 미개설';
       else label='관련 교과영역';
       if(!buckets[label]){ buckets[label]=[]; order.push(label); }
@@ -790,6 +845,7 @@
     modal.querySelectorAll('.chip.picked[data-name]').forEach(ch=>{   // 현재 선택분 반영
       const n=ch.dataset.name; if(!arr.includes(n)) arr.push(n);
     });
+    lockedSet().forEach(n=>{ if(!arr.includes(n)) arr.push(n); });   // 확정 과목은 항상 유지
     setPicked(arr); updatePickedUI(); closeModal();
   }
   function openModal(p){
@@ -819,7 +875,7 @@
   /* 학기 마일스톤 클릭 → 그 학기에 담은 과목 팝업 */
   function openSemModal(label){
     modalMode='sem'; modalP=null; modalSem=label;
-    const picks=getPicked().filter(n=>{ const s=lookupSubject(n); return s.status==='open' && ORD_LABEL[semOrd(s.label)]===label; });
+    const picks=getPicked().filter(n=>{ const lo=lockedSemOf(n); if(lo) return lo===label; const s=lookupSubject(n); return s.status==='open' && ORD_LABEL[semOrd(s.label)]===label; });
     const q=QUOTA[label]||0, cls=picks.length>q?'over':(picks.length>=q?'done':'');
     const body = !picks.length
       ? '<div class="pop-empty">아직 이 학기에 담은 과목이 없어요.<br>학교 카드를 눌러 과목을 담아보세요.</div>'
@@ -835,8 +891,9 @@
   /* ---- 홈 통계 팝업: 담은 과목(학기별) / 관심 계열 ---- */
   function semBuckets(arr){
     const buckets={}, order=[];
-    arr.forEach(name=>{ const s=lookupSubject(name); let label;
-      if(s.status==='open') label=ORD_LABEL[semOrd(s.label)]||s.label;
+    arr.forEach(name=>{ const lo=lockedSemOf(name); const s=lookupSubject(name); let label;
+      if(lo) label=lo;
+      else if(s.status==='open') label=ORD_LABEL[semOrd(s.label)]||s.label;
       else if(s.status==='none') label='속초고 미개설'; else label='관련 교과영역';
       if(!buckets[label]){ buckets[label]=[]; order.push(label); } buckets[label].push(name); });
     const LO={'1학년 1학기':1,'1학년 2학기':2,'2학년 1학기':3,'2학년 2학기':4,'3학년 1학기':5,'3학년 2학기':6,'속초고 미개설':100,'관련 교과영역':101};
@@ -948,7 +1005,7 @@
   /* 과목 칩 탭 → 담기 토글 (인라인 카드) */
   results.addEventListener('click',e=>{
     const ch=e.target.closest('.chip');
-    if(ch && ch.dataset.name){ togglePick(ch.dataset.name); ch.classList.toggle('picked'); return; }
+    if(ch && ch.dataset.name){ if(ch.dataset.locked) return; togglePick(ch.dataset.name); ch.classList.toggle('picked'); return; }
     const el=e.target.closest('.card.cau'); if(!el) return;
     const p=PROGRAMS[Number(el.dataset.id)]; if(p) openModal(p);
   });
@@ -957,10 +1014,10 @@
     if(modalMode==='program'){
       if(e.target.closest('#mPickBtn')){ commitModalPicks(); return; }   // 담기 확정
       const ch=e.target.closest('.chip');
-      if(ch && ch.dataset.name){ ch.classList.toggle('picked'); updateModalCount(); }  // 선택 토글(저장X)
+      if(ch && ch.dataset.name){ if(ch.dataset.locked) return; ch.classList.toggle('picked'); updateModalCount(); }  // 선택 토글(저장X)
     } else if(modalMode==='pick'){
       const ch=e.target.closest('.chip');
-      if(ch && ch.dataset.name){ togglePick(ch.dataset.name); openPickModal(); }   // 담은 과목 빼기 + 재렌더
+      if(ch && ch.dataset.name){ if(ch.dataset.locked) return; togglePick(ch.dataset.name); openPickModal(); }   // 담은 과목 빼기 + 재렌더
     } else if(modalMode==='gye'){
       const b=e.target.closest('.gye-chip');
       if(b){ closeModal(); goApp('gye', b.dataset.sel); }   // 해당 계열 가이드로 이동
@@ -969,7 +1026,7 @@
       if(b){ setAva(b.dataset.src); closeModal(); }   // 프로필 사진 선택
     } else if(modalMode==='sem'){
       const ch=e.target.closest('.chip');
-      if(ch && ch.dataset.name){ togglePick(ch.dataset.name); openSemModal(modalSem); }   // 그 학기 과목 빼기
+      if(ch && ch.dataset.name){ if(ch.dataset.locked) return; togglePick(ch.dataset.name); openSemModal(modalSem); }   // 그 학기 과목 빼기
     }
   });
   modalBack.addEventListener('click',e=>{
@@ -1027,32 +1084,54 @@
   const GRADE_KEY='sokcho_grade_v1';
   const landing=document.getElementById('landing');
   function getGrade(){ try{ return localStorage.getItem(GRADE_KEY); }catch(e){ return null; } }
-  function gradeLabel(){ const g=getGrade(); return g? g+'학년' : '학년 미설정'; }
+  function gradeLabel(){ const g=getGrade(); if(!g) return '학년 미설정';
+    const id=getStu(); const st=(id&&window.STUDENTS)?window.STUDENTS[id]:null;
+    return st ? g+'학년 · '+st.name+'('+id+')' : g+'학년'; }
   function updateGradeUI(){ const el=document.getElementById('myGradeLabel'); if(el) el.textContent=gradeLabel(); }
   function setGrade(g){ try{ localStorage.setItem(GRADE_KEY, g); }catch(e){} updateGradeUI(); }
+  function fitLanding(){ const h=window.innerHeight+'px'; landing.style.height=h;
+    const lp=landing.firstElementChild; if(lp) lp.style.height=h; }
+  window.addEventListener('resize', fitLanding);
+  window.addEventListener('orientationchange', ()=>setTimeout(fitLanding,120));
+  function lpShowGrades(){ const a=document.getElementById('lpGrades'),b=document.getElementById('lpLogin'),n=document.getElementById('lpNote');
+    if(a)a.hidden=false; if(b)b.hidden=true; if(n)n.hidden=true; }
+  function lpShowLogin(){ const a=document.getElementById('lpGrades'),b=document.getElementById('lpLogin'),er=document.getElementById('lpErr'),n=document.getElementById('lpNote');
+    if(a)a.hidden=true; if(b)b.hidden=false; if(er)er.hidden=true; if(n)n.hidden=true; }
   function showLanding(){ landing.hidden=false; home.hidden=true; app.hidden=true; my.hidden=true;
-    const n=document.getElementById('lpNote'); if(n) n.hidden=true; window.scrollTo(0,0); }
+    lpShowGrades(); fitLanding(); window.scrollTo(0,0); }
   function leaveLanding(){ landing.hidden=true; showHome(); }
   landing.addEventListener('click', e=>{
     if(e.target.closest('#lpGo')){ leaveLanding(); return; }
-    const b=e.target.closest('.lp-grade'); if(!b) return;
-    const g=b.dataset.grade; setGrade(g);
-    if(g==='2'){ leaveLanding(); }
-    else {
-      const n=document.getElementById('lpNote'); n.hidden=false;
-      n.innerHTML='1학년 추천 가이드는 곧 제공될 예정이에요 🛠️<br><a id="lpGo">2학년 가이드 먼저 둘러보기 →</a>';
+    if(e.target.closest('#lpBack')){ lpShowGrades(); return; }
+    if(e.target.closest('#lpLoginBtn')){
+      const hak=(document.getElementById('lpHak').value||'').trim();
+      const name=(document.getElementById('lpName').value||'').trim();
+      const er=document.getElementById('lpErr');
+      if(!/^\d{5}$/.test(hak) || !name){ er.textContent='학번 5자리와 이름을 정확히 입력해 주세요.'; er.hidden=false; return; }
+      const rec=window.STUDENTS && window.STUDENTS[hak];
+      if(!rec || rec.name!==name){ er.textContent='학번 또는 이름이 일치하지 않아요. 다시 확인해 주세요.'; er.hidden=false; return; }
+      setStu(hak); setGrade('2'); seedLockedPicks(); updatePickedUI(); leaveLanding();
+      return;
     }
+    const b=e.target.closest('.lp-grade'); if(!b) return;
+    const g=b.dataset.grade;
+    if(g==='2'){ lpShowLogin(); return; }
+    setGrade('1'); setStu('');
+    const n=document.getElementById('lpNote'); n.hidden=false;
+    n.innerHTML='1학년 추천 가이드는 곧 제공될 예정이에요 🛠️<br><a id="lpGo">2학년 가이드 먼저 둘러보기 →</a>';
   });
   document.getElementById('myGrade').addEventListener('click', showLanding);
   /* 마이페이지에서 담은 과목 칩 탭 → 빼기 */
   my.addEventListener('click', e=>{
     const ch=e.target.closest('.chip'); if(!ch || !ch.dataset.name) return;
+    if(ch.dataset.locked) return;   /* 확정 과목은 빼기 불가 */
     togglePick(ch.dataset.name);  /* 제거 후 updatePickedUI가 목록 재렌더 */
   });
 
   setNick(getNick());
   applyAva();
   updateGradeUI();
+  seedLockedPicks();   // 로그인 유지 중인 2학년 학생의 확정 과목 반영
   render();
   updatePickedUI();
   if(!getGrade()) showLanding();   // 첫 접속(학년 미설정) → 학년 선택 랜딩
