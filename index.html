@@ -393,6 +393,14 @@
       <button class="lp-grade" data-grade="1">1학년</button>
       <button class="lp-grade" data-grade="2">2학년</button>
     </div>
+    <div class="lp-login" id="lpLogin" hidden>
+      <div class="lp-login-t" id="lpLoginT">2학년 로그인</div>
+      <input class="lp-input" id="lpHak" type="tel" inputmode="numeric" maxlength="5" placeholder="학번 5자리 (예: 20101)">
+      <input class="lp-input" id="lpName" type="text" placeholder="이름">
+      <div class="lp-login-err" id="lpErr" hidden></div>
+      <button class="lp-login-btn" id="lpLoginBtn">확인</button>
+      <button class="lp-back" id="lpBack">‹ 학년 다시 선택</button>
+    </div>
     <div class="lp-note" id="lpNote" hidden></div>
   </div>
 </div>
@@ -564,6 +572,7 @@
 
 <script src="data.js"></script>
 <script src="data_students.js"></script>
+<script src="data_students1.js"></script>
 <script>
 (function(){
   const {PROGRAMS, GUIDE, GYE, lookupSubject} = window.APPDATA;
@@ -685,6 +694,7 @@
   const STU_KEY='sokcho_stu_v1';
   function getStu(){ try{ return localStorage.getItem(STU_KEY)||''; }catch(e){ return ''; } }
   function setStu(id){ try{ id? localStorage.setItem(STU_KEY,id) : localStorage.removeItem(STU_KEY); }catch(e){} }
+  function isG2(){ return !!(window.STUDENTS && window.STUDENTS[getStu()]); }   /* 로그인한 2학년 학생 */
   function getNick(){ try{ return localStorage.getItem(NICK_KEY) || '속초고 학생'; }catch(e){ return '속초고 학생'; } }
   function setNick(v){ try{ localStorage.setItem(NICK_KEY, v); }catch(e){}
     const el=document.getElementById('myNick'); if(el) el.textContent=v;
@@ -734,7 +744,7 @@
     if (!force && state.onlyOpen && cls!=='open') return '';
     const lk = isLocked(name);
     // 로그인한 2학년 학생: 2학년 전용 과목은 신청 불가(3학년만), 확정 과목은 빼기 불가
-    const blocked = lk || (getStu() && s.status==='open' && /2학년/.test(s.label) && !/3학년/.test(s.label));
+    const blocked = lk || (isG2() && s.status==='open' && /2학년/.test(s.label) && !/3학년/.test(s.label));
     const on = (lk || isPicked(name)) ? ' picked' : '';
     const lc = blocked ? ' locked' : '';
     return `<span class="chip ${cls}${on}${lc}" data-name="${name}"${blocked?' data-locked="1"':''}><span class="nm">${name}</span>${grade?`<span class="g">${grade}</span>`:''}</span>`;
@@ -1084,8 +1094,9 @@
   const GRADE_KEY='sokcho_grade_v1';
   const landing=document.getElementById('landing');
   function getGrade(){ try{ return localStorage.getItem(GRADE_KEY); }catch(e){ return null; } }
+  function rosterFor(g){ return g==='1' ? (window.STUDENTS1||{}) : (window.STUDENTS||{}); }
   function gradeLabel(){ const g=getGrade(); if(!g) return '학년 미설정';
-    const id=getStu(); const st=(id&&window.STUDENTS)?window.STUDENTS[id]:null;
+    const id=getStu(); const st=id?rosterFor(g)[id]:null;
     return st ? g+'학년 · '+st.name+'('+id+')' : g+'학년'; }
   function updateGradeUI(){ const el=document.getElementById('myGradeLabel'); if(el) el.textContent=gradeLabel(); }
   function setGrade(g){ try{ localStorage.setItem(GRADE_KEY, g); }catch(e){} updateGradeUI(); }
@@ -1093,32 +1104,32 @@
     const lp=landing.firstElementChild; if(lp) lp.style.height=h; }
   window.addEventListener('resize', fitLanding);
   window.addEventListener('orientationchange', ()=>setTimeout(fitLanding,120));
+  let lpGrade='2';
   function lpShowGrades(){ const a=document.getElementById('lpGrades'),b=document.getElementById('lpLogin'),n=document.getElementById('lpNote');
     if(a)a.hidden=false; if(b)b.hidden=true; if(n)n.hidden=true; }
-  function lpShowLogin(){ const a=document.getElementById('lpGrades'),b=document.getElementById('lpLogin'),er=document.getElementById('lpErr'),n=document.getElementById('lpNote');
+  function lpShowLogin(){ const a=document.getElementById('lpGrades'),b=document.getElementById('lpLogin'),er=document.getElementById('lpErr'),n=document.getElementById('lpNote'),
+      t=document.getElementById('lpLoginT'),hk=document.getElementById('lpHak'),nm=document.getElementById('lpName');
+    if(t) t.textContent=(lpGrade==='1'?'1학년':'2학년')+' 로그인';
+    if(hk){ hk.placeholder='학번 5자리 (예: '+(lpGrade==='1'?'10101':'20101')+')'; hk.value=''; }
+    if(nm) nm.value='';
     if(a)a.hidden=true; if(b)b.hidden=false; if(er)er.hidden=true; if(n)n.hidden=true; }
   function showLanding(){ landing.hidden=false; home.hidden=true; app.hidden=true; my.hidden=true;
     lpShowGrades(); fitLanding(); window.scrollTo(0,0); }
   function leaveLanding(){ landing.hidden=true; showHome(); }
   landing.addEventListener('click', e=>{
-    if(e.target.closest('#lpGo')){ leaveLanding(); return; }
     if(e.target.closest('#lpBack')){ lpShowGrades(); return; }
     if(e.target.closest('#lpLoginBtn')){
       const hak=(document.getElementById('lpHak').value||'').trim();
       const name=(document.getElementById('lpName').value||'').trim();
       const er=document.getElementById('lpErr');
       if(!/^\d{5}$/.test(hak) || !name){ er.textContent='학번 5자리와 이름을 정확히 입력해 주세요.'; er.hidden=false; return; }
-      const rec=window.STUDENTS && window.STUDENTS[hak];
+      const rec=rosterFor(lpGrade)[hak];
       if(!rec || rec.name!==name){ er.textContent='학번 또는 이름이 일치하지 않아요. 다시 확인해 주세요.'; er.hidden=false; return; }
-      setStu(hak); setGrade('2'); seedLockedPicks(); updatePickedUI(); leaveLanding();
+      setStu(hak); setGrade(lpGrade); seedLockedPicks(); updatePickedUI(); leaveLanding();
       return;
     }
     const b=e.target.closest('.lp-grade'); if(!b) return;
-    const g=b.dataset.grade;
-    if(g==='2'){ lpShowLogin(); return; }
-    setGrade('1'); setStu('');
-    const n=document.getElementById('lpNote'); n.hidden=false;
-    n.innerHTML='1학년 추천 가이드는 곧 제공될 예정이에요 🛠️<br><a id="lpGo">2학년 가이드 먼저 둘러보기 →</a>';
+    lpGrade=b.dataset.grade; lpShowLogin();
   });
   document.getElementById('myGrade').addEventListener('click', showLanding);
   /* 마이페이지에서 담은 과목 칩 탭 → 빼기 */
