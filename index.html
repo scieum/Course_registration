@@ -92,6 +92,11 @@
   #results .chip,.modal .chip{cursor:pointer;}
   .chip.picked{box-shadow:0 0 0 2px var(--near);}
   .chip.picked .nm::before{content:"✓ ";font-weight:700;}
+  /* 학기별 정원 표시 */
+  .q-cnt{font-weight:700;color:var(--silver);font-size:.92em;}
+  .q-cnt.done{color:#0f7a3d;}
+  .q-cnt.over{color:#c0392b;}
+  .my-quota-note{font-size:12px;color:var(--mute);margin-bottom:12px;}
   /* 중앙대 모달: 담기 인터페이스 */
   .modal .mpick{font-size:12.5px;color:var(--stone);background:var(--snow);border:1px solid var(--line);
     border-radius:10px;padding:9px 12px;margin:12px 0 2px;line-height:1.4;}
@@ -223,7 +228,7 @@
   #home .bar .dot{position:absolute;top:50%;width:9px;height:9px;border-radius:50%;background:#fff;
     transform:translate(-50%,-50%);box-shadow:0 0 0 2px #f0e3c4;}
   #home .ticks{display:flex;margin-top:12px;}
-  #home .tick{flex:1;text-align:center;}
+  #home .tick{flex:1;text-align:center;cursor:pointer;}
   #home .tick .t-lab{font-size:13px;font-weight:600;color:#3a2e16;}
   #home .tick.off .t-lab{color:#bfae86;}
   #home .tick .t-btn{margin-top:2px;display:inline-flex;align-items:center;gap:5px;
@@ -529,25 +534,43 @@
     return GYE.filter(g=>gset.has(g));
   }
   function pickedGyeCount(){ return pickedGyeList().length; }
+
+  /* ---- 학기별 선택 기준: 2학년 학기별 4과목 · 3학년 학기별 6과목 (총 20) ---- */
+  const QUOTA={'2학년 1학기':4,'2학년 2학기':4,'3학년 1학기':6,'3학년 2학기':6};
+  const SEM_ORDER=['2학년 1학기','2학년 2학기','3학년 1학기','3학년 2학기'];
+  const SEM_SHORT={'2학년 1학기':'2-1','2학년 2학기':'2-2','3학년 1학기':'3-1','3학년 2학기':'3-2'};
+  function pickedBySem(){
+    const m={}; SEM_ORDER.forEach(l=>m[l]=0);
+    getPicked().forEach(n=>{ const s=lookupSubject(n);
+      if(s.status==='open'){ const l=ORD_LABEL[semOrd(s.label)]; if(l in m) m[l]++; } });
+    return m;
+  }
+  function semLabelHtml(label,count){
+    if(QUOTA[label]==null) return label;
+    const q=QUOTA[label], cls = count>q?'over':(count>=q?'done':'');
+    return `${label} <span class="q-cnt ${cls}">${count}/${q}</span>`;
+  }
+  function updateMilestones(){
+    const counts=pickedBySem();
+    let filled=0,total=0;
+    SEM_ORDER.forEach(l=>{ filled+=Math.min(counts[l],QUOTA[l]); total+=QUOTA[l]; });
+    const fill=document.querySelector('#home .bar .fill'); if(fill) fill.style.width=Math.round(filled/total*100)+'%';
+    const ticks=document.querySelector('#home .ticks');
+    if(ticks){
+      ticks.innerHTML=SEM_ORDER.map(l=>{
+        const n=counts[l], q=QUOTA[l], met=n>=q;
+        return `<div class="tick${n===0?' off':''}" data-sem="${l}"><div class="t-lab">${SEM_SHORT[l]}</div>`+
+          `<button class="t-btn">${met?'🏅 달성':n+'/'+q}</button></div>`;
+      }).join('');
+    }
+  }
   function renderPickedList(){
     const box=document.getElementById('myPicked'); if(!box) return;
     const arr=getPicked();
-    if(!arr.length){ box.innerHTML='<div class="my-empty">아직 담은 과목이 없어요.<br>추천과목에서 과목을 탭해 담아보세요.</div>'; return; }
-    // 학기별 그룹핑
-    const buckets={}, order=[];
-    arr.forEach(name=>{
-      const s=lookupSubject(name);
-      let label;
-      if(s.status==='open') label=ORD_LABEL[semOrd(s.label)]||s.label;
-      else if(s.status==='none') label='속초고 미개설';
-      else label='관련 교과영역';
-      if(!buckets[label]){ buckets[label]=[]; order.push(label); }
-      buckets[label].push(name);
-    });
-    const LO={'1학년 1학기':1,'1학년 2학기':2,'2학년 1학기':3,'2학년 2학기':4,'3학년 1학기':5,'3학년 2학기':6,'속초고 미개설':100,'관련 교과영역':101};
-    order.sort((a,b)=>(LO[a]||50)-(LO[b]||50));
-    box.innerHTML=order.map(l=>`<div class="my-semgrp"><div class="my-semlabel">${l}</div>`+
-      `<div class="chips">${buckets[l].map(n=>chip(n,true)).join('')}</div></div>`).join('');
+    const note='<div class="my-quota-note">학기별 선택 기준 · 2학년 4과목 / 3학년 6과목</div>';
+    if(!arr.length){ box.innerHTML=note+'<div class="my-empty">아직 담은 과목이 없어요.<br>추천과목에서 과목을 탭해 담아보세요.</div>'; return; }
+    box.innerHTML=note+semBuckets(arr).map(grp=>`<div class="my-semgrp"><div class="my-semlabel">${semLabelHtml(grp.label, grp.items.length)}</div>`+
+      `<div class="chips">${grp.items.map(n=>chip(n,true)).join('')}</div></div>`).join('');
   }
   function updatePickedUI(){
     const c=getPicked().length;
@@ -555,6 +578,7 @@
     const g=pickedGyeCount();
     document.querySelectorAll('[data-gye-count]').forEach(el=>{ el.textContent=g; });
     renderPickedList();
+    updateMilestones();
   }
 
   /* 닉네임 — 캐시 저장 */
@@ -696,7 +720,7 @@
   }
 
   /* ---- 모달 (중앙대 추천과목, 학기별) — 과목 담기 인터페이스 ---- */
-  let modalP=null, modalMode='program';
+  let modalP=null, modalMode='program', modalSem=null;
   function modalSubjects(p){ return new Set([...p.core,...p.rec].flatMap(expand)); }
   function updateModalCount(){
     const n=modal.querySelectorAll('.chip.picked').length;
@@ -734,7 +758,23 @@
     modalBack.hidden=false;
     document.body.style.overflow='hidden';
   }
-  function closeModal(){ modalBack.hidden=true; document.body.style.overflow=''; modalP=null; modalMode='program'; }
+  function closeModal(){ modalBack.hidden=true; document.body.style.overflow=''; modalP=null; modalMode='program'; modalSem=null; }
+
+  /* 학기 마일스톤 클릭 → 그 학기에 담은 과목 팝업 */
+  function openSemModal(label){
+    modalMode='sem'; modalP=null; modalSem=label;
+    const picks=getPicked().filter(n=>{ const s=lookupSubject(n); return s.status==='open' && ORD_LABEL[semOrd(s.label)]===label; });
+    const q=QUOTA[label]||0, cls=picks.length>q?'over':(picks.length>=q?'done':'');
+    const body = !picks.length
+      ? '<div class="pop-empty">아직 이 학기에 담은 과목이 없어요.<br>학교 카드를 눌러 과목을 담아보세요.</div>'
+      : '<div class="chips">'+picks.map(n=>chip(n,true)).join('')+'</div>';
+    modal.innerHTML = `
+      <div class="grab"></div>
+      <div class="mtop"><span class="mclose" id="mclose">닫기 ✕</span></div>
+      <div class="mhead"><div><div class="mmojip">${label}</div><div class="muni">담은 과목 <span class="q-cnt ${cls}">${picks.length}/${q}</span>${picks.length?' · 칩을 탭하면 빼기':''}</div></div></div>
+      ${body}`;
+    modalBack.hidden=false; document.body.style.overflow='hidden';
+  }
 
   /* ---- 홈 통계 팝업: 담은 과목(학기별) / 관심 계열 ---- */
   function semBuckets(arr){
@@ -752,13 +792,13 @@
     const arr=getPicked();
     const body = !arr.length
       ? '<div class="pop-empty">아직 담은 과목이 없어요.<br>학교 카드를 눌러 과목을 담아보세요.</div>'
-      : semBuckets(arr).map(grp=>`<div class="semgrp"><div class="semlabel">${grp.label}</div>
+      : semBuckets(arr).map(grp=>`<div class="semgrp"><div class="semlabel">${semLabelHtml(grp.label, grp.items.length)}</div>
           <div class="chips">${grp.items.map(n=>chip(n,true)).join('')}</div></div>`).join('');
     modal.innerHTML = `
       <div class="grab"></div>
       <div class="mtop"><span class="mclose" id="mclose">닫기 ✕</span></div>
       <div class="mhead"><img class="e-pop" src="img/pin.png" alt="" aria-hidden="true">
-        <div><div class="mmojip">내가 담은 과목</div><div class="muni">총 ${arr.length}과목${arr.length?' · 칩을 탭하면 빼기':''}</div></div></div>
+        <div><div class="mmojip">내가 담은 과목</div><div class="muni">총 ${arr.length}과목 · 2학년 4과목 / 3학년 6과목</div></div></div>
       ${body}`;
     modalBack.hidden=false; document.body.style.overflow='hidden';
   }
@@ -871,6 +911,9 @@
     } else if(modalMode==='avatar'){
       const b=e.target.closest('.ava-opt');
       if(b){ setAva(b.dataset.src); closeModal(); }   // 프로필 사진 선택
+    } else if(modalMode==='sem'){
+      const ch=e.target.closest('.chip');
+      if(ch && ch.dataset.name){ togglePick(ch.dataset.name); openSemModal(modalSem); }   // 그 학기 과목 빼기
     }
   });
   modalBack.addEventListener('click',e=>{
@@ -906,6 +949,11 @@
   document.querySelectorAll('#home .stat.to-my').forEach(el=>el.addEventListener('click',()=>{
     if(el.dataset.pop==='gye') openGyeModal(); else openPickModal();
   }));
+  /* 학기 마일스톤 클릭 → 학기별 담은 과목 팝업 */
+  document.querySelector('#home .ticks').addEventListener('click',e=>{
+    const t=e.target.closest('.tick'); if(!t || !t.dataset.sem) return;
+    openSemModal(t.dataset.sem);
+  });
 
   /* ---- 마이페이지 ---- */
   const my = document.getElementById('my');
